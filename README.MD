@@ -260,6 +260,14 @@ Angular:
 		  {path:'**',component:ErrorComponent}
 	      ];
 		  
+		app.component.html
+			** we need to put <router-outlet></router-outlet> in app.component.html to load the section based on URL
+			** Header and footer will remain same, without this routing will not work
+			
+		<app-menu></app-menu>		
+		<router-outlet></router-outlet>
+		<app-footer></app-footer>
+		  
 		Routing from one page to another page
 		-------------------------------------
 			if login successful we are routing to welcome page
@@ -273,8 +281,26 @@ Angular:
 				  this.router.navigate(['welcome']);
 				}
 			}
+			
+		Routing with relative path
+		--------------------------
+			*say now you are in 
+				localhost:4200/servers/1
+				Now you have to go to servers/:id/edit
+				
+			You can do this using absolute path
+				this.route.navigate(['/servers',this.server.id,'edit']);
+			Using relative path
+				this.route.navigate(['edit'],{ relativeTo: this.activatedRoute});
+				
+			passing current request params to next request
+				this.route.navigate(['/servers',this.server.id,'edit'],{queryParamsHandling:"preserve"});
+				//queryParamsHandling:"merge" merge : Merge new with current parameters. preserve : Preserve current parameters.
+				//this.route.navigate(['edit'],{ relativeTo: this.activatedRoute,queryParamsHandling:"preserve"});
+				
 		Routing with parameter
 		-----------------------
+		Type 1:
 		we are going to display login userName in welcome page
 		1.Update route with param
 			 app-routing.module.ts
@@ -294,11 +320,134 @@ Angular:
 				}
 	    4. display userName in html using string interpolation
 			welcome{{userName}}
+		
+		Type 2:
+		-------
+		********Above step 1,2,3,4 will work only if request comes from different component
+		In some scenario we will reload same page with different parameter in that scenario we have to use 	this.route.param to read variable
+		**snapshot only work during component initialization
+		
+		Scenario
+			Server-Component -> localhost:4200/servers/1
+				server name:XXX
+				server id: 1
+				Click Here for Next Server(<a [routerLink]="['/servers',server.id+1]">Next Server</a>)
+				
+				here request is not coming from out side , it is from same page.
+				
+			TS code to read params 
+			----------------------
+			ngOnInit() {    
+				//FOR REQUEST FROM OUTSIDE
+				const serverId = Number(this.activatedRoute.snapshot.params['id'])
+				this.server = this.serversService.getServer(serverId);
+				
+				//FOR REQUEST FROM SAME PAGE(IT WILL NOT HAPPEN FIRST TIME ,SO WE HAVE TO LISTEN FOR CHANGE)
+				this.activatedRoute.params.subscribe(
+				  (params:Params)=>{
+					this.server = this.serversService.getServer(Number(params.id));        
+				  }
+				)
+			}
+		
+		Query PARAMS IN Routing
+		-----------------------
+			<a [routerLink]="['/servers',server.id]" [queryParams]="{allowEdit: '1'}" class="list-group-item"
+			*ngFor="let server of servers">
+			{{ server.name }}
+			</a>
 			
+			TS
+			--
+			this.activatedRoute.snapshot.queryParams['allowEdit']
+			
+		Passing Static Data Via Router Link
+		-----------------------------------
+			 {path:'**',component:ErrorComponent,data:{msg:"The page your looking for not found"}}
+			 
+			 TS
+			 this.message=this.activatedRoute.snapshot.data['msg'];
+			 
+		Loading Data before loading component in router
+		-----------------------------------------------
+			{ path: "**", component: ErrorComponent,resolve:{errorMsgResolver:ErrorMessgeResolver} }
+			
+			ErrorMessgeResolver Service
+			---------------------------
+				export class ErrorMessage{
+					constructor(public errorCode:string,public errorMessage:string) { } 
+				}
+
+				@Injectable({
+				  providedIn: 'root'
+				})
+				export class ErrorMessgeResolver implements Resolve<ErrorMessage> {
+				  resolve(route: ActivatedRouteSnapshot, state: RouterStateSnapshot): Observable<ErrorMessage> | Promise<ErrorMessage> | ErrorMessage{
+					//HERE WE CAN LOAD DATA BY CALLING EXTERNAL SERVICE ALSO
+					return new ErrorMessage("500","Internal Server Error");
+				  }
+				  constructor() { }
+				}
+			Component
+			---------
+				this.errorObj=this.activatedRoute.snapshot.data['errorMsgResolver'];
+			
+		
 		Routing Via HTML Link
 		----------------------
 		<a routerLink="/todos">here</a></div>
 		
+		routerLinkActive
+		----------------
+		* routerLinkActive is used to add css to currently active route
+			<ul class="nav nav-tabs">
+				<li role="presentation" class="active"><a routerLink="/">Home</a></li>
+				<li role="presentation"><a routerLink="/servers">Servers</a></li>
+			</ul>
+	
+		* if we use routerLinkActive current route and route "/" will mark active we can fix this using
+		routerLinkActiveOptions , with this only currently active route is marked active
+			<ul class="nav nav-tabs">
+				<li role="presentation" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}"><a routerLink="/">Home</a></li>
+				<li role="presentation" routerLinkActive="active"><a routerLink="/servers">Servers</a></li>
+			</ul>
+			
+	Loading Child Next to parent
+	----------------------------
+		route
+		-----
+		{path:"servers",component:ServersComponent},
+		{path:"servers/:id",component:ServerComponent},
+		{path:"servers/:id/edit",component:EditServerComponent},
+		
+		template
+		--------
+		<div class="row">
+		  <div class="col-xs-12 col-sm-4">
+			<div class="list-group">
+			  <a [routerLink]="['/servers',server.id]" [queryParams]="{allowEdit: '1'}" class="list-group-item" *ngFor="let server of servers">
+				{{ server.name }}
+			  </a>
+			</div>
+		  </div>
+		  <div class="col-xs-12 col-sm-4">
+			<router-outlet></router-outlet>
+		  </div>
+		</div>
+		
+		Above routing config 
+		/servers   -> list all servers
+		/servers/1 -> loads individual server component -> it replaces serverlist component , whole page will be individual server component
+		
+		*By using *nested routing we can load server component next to server list component
+		{
+			path: "servers",component: ServersComponent,children: [
+			  { path: ":id", component: ServerComponent },
+			  { path: ":id/edit", component: EditServerComponent }
+			]
+		}
+					
+	
 	Services:
 	---------
 		ng generate service service-name or ng g s service-name -> create new Service (ng generate service hardCodedAuthendication)
@@ -359,6 +508,53 @@ Angular:
 		app-routing.module.ts
 		---------------------			
 		{path:'todos',component:ListTodosComponent,canActivate:[RouteGuardService]},
+	
+		CanDeactivate - Preventing user from leaving page before saving changes 
+		------------------------------------------------------------------------
+		{ path: ":id/edit", component: EditServerComponent,canDeactivate:[CanDeactivateGuardService]}
+		 
+		Deactivate Guard Service
+		
+			import { Injectable } from "@angular/core";
+			import {
+			  CanDeactivate,
+			  ActivatedRouteSnapshot,
+			  RouterStateSnapshot
+			} from "@angular/router";
+			import { Observable } from "rxjs";
+
+			export interface CanDeactivateComponent {
+			  canDeactivate: () => Observable<boolean> | Promise<boolean> | boolean;
+			}
+
+			@Injectable({
+			  providedIn: "root"
+			})
+			export class CanDeactivateGuardService
+			  implements CanDeactivate<CanDeactivateComponent> {
+
+			  canDeactivate(
+				component: CanDeactivateComponent,
+				currentRoute: ActivatedRouteSnapshot,
+				currentState: RouterStateSnapshot,
+				nextState?: RouterStateSnapshot
+			  ): Observable<boolean> | Promise<boolean> | boolean {     
+				return component.canDeactivate();
+			  }
+
+			  constructor() {}
+			}
+			
+		Component
+			export class EditServerComponent implements OnInit, CanDeactivateComponent {
+			  canDeactivate(): Observable<boolean> | Promise<boolean> | boolean {
+				if (this.isFormDataChanged() && !this.isChangesSaved) {
+				  confirm("Dont you want discard the changes");
+				} else {
+				  return true;
+				}
+			  }  
+			}
 		
 	Calling External Service:
 	-------------------------
@@ -408,4 +604,125 @@ Angular:
 	2. Define as PROVIDER in app.module.ts
 		 providers: [{provide: HTTP_INTERCEPTORS,useClass: HttpBasicAuthInterceptorService,multi: true}],
 		 
+	Best Practice:
+	-------------
+	 return  this.recipes.slice()
+	 
+	Complex Inter Component Communication using Services
+	---------------------------------------------------------
+		1. recipe-item (child or recipe-list) is grand child of recipe 
+		2. onclick recipe-item component calls service method to public selected recipe
+		3. recipe component listens to service and reads data
+		4. By using service like this we can get rid of chain of emit and listen events.we can directly pass data from grand child 
+		Service:  
+		--------
+		it gives method to emit the data
+		import { Injectable, EventEmitter } from '@angular/core';
+		import { Recipe } from './recipe.model';
+
+		@Injectable({
+		  providedIn: 'root'
+		})
+		export class RecipeDataService {
+		  public selectedRecipeEmitter= new EventEmitter<Recipe>();  
+		  emitRecipe(recipe:Recipe){
+			this.selectedRecipeEmitter.emit(recipe);
+		  }
+		}
+		
+		recipe-item publishing data using service
+		-----------------------------------------
+		import { Component, OnInit, Input} from '@angular/core';
+		import { Recipe } from '../../recipe.model';
+		import { RecipeDataService } from '../../recipe-data.service';
+
+		@Component({  selector: 'app-recipe-item',  templateUrl: './recipe-item.component.html',  styleUrls: ['./recipe-item.component.css']})
+		export class RecipeItemComponent implements OnInit {
+		  @Input('currentRecipeInfo') recipe:Recipe=new Recipe('','','');  
+		  constructor(private recipeDataSerice:RecipeDataService) { }  
+		  onClicRecipe(){
+			this.recipeDataSerice.emitRecipe(this.recipe)
+		  }
+		}
+		
+		recipe getting selected data by listening to service
+		-----------------------------------------------------
+		export class RecipesComponent implements OnInit {
+		  recipeToDetailsComponent:Recipe
+		  constructor(private recipeDataService:RecipeDataService) { }
+		  ngOnInit() {
+			this.recipeDataService.selectedRecipeEmitter.subscribe(
+			  recipe=>this.recipeToDetailsComponent=recipe
+			)
+		  }
+		}
+		
+	Observables
+	**********************************
+	**********************************
+	**********************************
 	
+	Angular Forms
+	-------------
+		Template Driven Forms
+		Reactive Forms
+		
+		Template Driven Forms
+		---------------------
+			--- (ngSubmit) ngForm ngModel are few items to notice here
+			--- ngModel (need to added to elements which need to be submitted as part of form, if we use the that element should have name attribute)
+			--- ngForm #templateRef="ngForm" -- getting form in reffence variable
+			---	(ngSubmit) gives us option to call method on submit
+			
+			<form (ngSubmit)="onSubmit(templateRef)" #templateRef="ngForm">
+				<input type="text" id="username" class="form-control" name="username" ngModel>
+				<input type="email" id="email" class="form-control" name="email" ngModel>
+				<button class="btn btn-primary" type="submit">Submit</button>
+			</form>
+			
+			TS
+			--
+				  onSubmit(form:NgForm){ console.log(form);}
+				  
+		Template Form with validations
+		------------------------------
+		Template
+			<form (ngSubmit)="onSubmit(templateRef)" #templateRef="ngForm">
+				<input type="email" class="form-control" name="email" ngModel required email #emailTempRef="ngModel">
+				<span class="text-danger" *ngIf="emailTempRef.dirty&&emailTempRef.invalid">Eamil is mandatory</span>
+
+				<select name="subscription" class="form-control">
+					<option *ngFor="let currentSubscription of subscriptionList" value="{{currentSubscription}}" [selected]="currentSubscription===defaultSubscription">{{currentSubscription}}</option>
+				</select>
+				<input type="password" class="form-control" name="pwd" ngModel required #passwordTempRef="ngModel">
+				<span class="text-danger" *ngIf="passwordTempRef.invalid&&passwordTempRef.dirty">Password is required</span>
+				
+				<button type="submit" class="btn btn-success" [disabled]="!templateRef.dirty||templateRef.invalid">SUBMIT</button>
+			</form>
+			
+		TS
+			export class AppComponent {
+				// {static: false} required from angular 8
+				@ViewChild('templateRef',{static: false}) viewChildData:NgForm;
+				
+				  subscriptionList=["Basic","Advanced","Pro"];
+				  defaultSubscription="Advanced";
+
+				  data={
+					seletedEmail:"",
+					seletedPwd:"",
+					selectedSubscription:""
+				  };
+				  onSubmit(ngForm:NgForm){
+					console.log(ngForm.form.value.email);
+					this.data.seletedEmail=ngForm.form.value.email;
+					this.data.seletedPwd=ngForm.form.value.pwd;
+					//WE CAN REED THE FORM DATA FROM VIEW CHILD ALSO, ngSbubmit ONLY CALLED ONLY ON FORM SUBMISSION
+					//IF YOU WANT TO DO SOME VALIDATION ON BLUR OR ONCHANGE YOU CAN GET DATA USING ViewChild
+					this.data.selectedSubscription=this.viewChildData.form.value.pwd;
+				  }
+			}
+		CSS
+			.form-control.ng-touched.ng-invalid:not(form)  {
+				border: 2px solid #a94442; /* red */
+			}
