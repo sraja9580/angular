@@ -726,3 +726,147 @@ Angular:
 			.form-control.ng-touched.ng-invalid:not(form)  {
 				border: 2px solid #a94442; /* red */
 			}
+			
+		Reactive Forms
+		--------------
+			ReactiveFormsModule --> import in app.module.ts
+					to work with reactive forms we needs , ReactiveFormsModule module
+			Steps:
+			------
+				1. ReactiveFormsModule in app.module.ts
+				2. singupForm: FormGroup; create form group in TS file and assign form-control fields in it
+					this.singupForm = new FormGroup( {'userName':new FormControl(null))
+				3. assign formGroup and formControls created in TS in template
+					[formGroup]="singupForm" -> in <form> field
+					formControlName="userName"
+				
+			1. app.module.ts
+			----------------
+				 ReactiveFormsModule --> import this module				
+			TS
+			--
+				export class AppComponent implements OnInit{
+				  genders = ['male', 'female'];
+				  singupForm: FormGroup;
+
+				  ngOnInit(): void{
+					this.singupForm = new FormGroup(
+					  {
+						'userName':new FormControl(null,Validators.requiredTrue),
+						'email':new FormControl(null,[Validators.requiredTrue,Validators.email]),
+						'gender':new FormControl(this.genders[0])        
+					  }      
+					); 
+				  }
+				  onSubmit(){
+					console.log(this.singupForm);    
+				  }
+				}
+			
+			Template
+			--------
+				<form (ngSubmit)="onSubmit()" [formGroup]="singupForm">
+				  <input type="text" id="username" class="form-control" formControlName="userName">
+				  <span *ngIf="!singupForm.get('userName').valid && singupForm.get('userName').touched">Please enter valid username</span>
+				  <input type="text" id="email" class="form-control" formControlName="email">
+				  <input type="radio" [value]="gender" formControlName="gender">{{ gender }}
+				  <button class="btn btn-primary" type="submit">Submit</button>
+				</form>
+				
+			Reactive Forms with *Nested FormGroup,Dynamic Form Controls using FormArray,Custom validations and Async Custom VALIDATION
+			--------------------------------------------------------------------------------------------------------------------------
+				TS
+				--
+				import { Component, OnInit } from "@angular/core";
+				import { FormGroup, FormControl, Validators, FormArray } from "@angular/forms";
+
+				@Component({
+				  selector: "app-root",
+				  templateUrl: "./app.component.html",
+				  styleUrls: ["./app.component.css"]
+				})
+				export class AppComponent implements OnInit {
+				  projectForm: FormGroup;
+				  projectStatusList = ["Stable", "Critical", "Finished"];
+				  ngOnInit(): void {
+					this.projectForm = new FormGroup({
+					  projIdEmail: new FormGroup({
+						projectName: new FormControl(null, [Validators.required,this.forbiddenProjectName.bind(this)]),
+						email: new FormControl(null,[Validators.required, Validators.email],this.forbiddenEmailAyscVal.bind(this))
+					  }),
+					  projectStatus: new FormControl(null),
+					  hobbies:new FormArray([])
+					});
+				  }
+
+				  //DYNAMIC ELEMENTS ADDING USING FORM ARRAY
+				  addHobbie(){
+					const hobbie = new FormControl(null,Validators.required);
+					(this.projectForm.get('hobbies') as FormArray).push(hobbie);
+				  }
+
+				  onSubmit() {
+					console.log(this.projectForm.value);
+				  }
+
+				  forbiddenProjectName(projectNameControl: FormControl): { [notAllowedName: string]: boolean } | null {
+					if (projectNameControl.value === "Test") return { notAllowedName: true };
+					return null;
+				  }
+				  // AYSNC VALIDATION
+				  forbiddenEmailAyscVal(emailControl: FormControl): Promise<any> {
+					if (emailControl.value === "abc@yz.com") {
+					  return new Promise((resolve, reject) => resolve({ blockedEmail: true }));
+					}
+					return new Promise((resolve, reject) => resolve(null));
+				  }
+				}
+				
+				Template
+				--------
+				<div class="container">
+				  <div class="row">
+					<div class="col-xs-12 col-sm-10 col-md-8 col-sm-offset-1 col-md-offset-2">
+					  <form (ngSubmit)="onSubmit()" [formGroup]="projectForm">
+						<div class="form-group" formGroupName="projIdEmail">
+						  <label for="projectName">Project Name</label>
+						  <input type="text" class="form-control" formControlName="projectName">
+						  <span
+							*ngIf="projectForm.get('projIdEmail.projectName').invalid&&projectForm.get('projIdEmail.projectName').touched">
+							<span *ngIf="projectForm.get('projIdEmail.projectName').errors['notAllowedName']">Name Test Not
+							  Allowed</span>
+							<span *ngIf="projectForm.get('projIdEmail.projectName').errors['required']">Project Name is required</span>
+						  </span>
+						  <hr>
+						  <label for="email">Email</label>
+						  <input type="email" class="form-control" formControlName="email">
+						  <span *ngIf="projectForm.get('projIdEmail.email').invalid&&projectForm.get('projIdEmail.email').touched">
+							<span *ngIf="projectForm.get('projIdEmail.email').errors['blockedEmail']">This Email is in blocked list Try
+							  different Email id</span>
+
+						  </span>
+						  <hr>
+						  <hr>
+						</div>
+						<div class="form-group">
+						  <label for="projectStatus">Project Status</label>
+						  <select name="projectStatus" class="form-control" formControlName="projectStatus">
+							<option *ngFor="let currentProjectStatus of projectStatusList" value="{{currentProjectStatus}}">
+							  {{currentProjectStatus}}</option>
+						  </select>
+						</div>
+						<button class="btn-btn-success" type="submit">Submit</button>
+
+						<hr>
+						<hr>
+						<div formArrayName="hobbies">
+						  <label for="Hobbies"></label>
+						  <button class="btn-primary" type="button" (click)="addHobbie()">New Hobbie</button>
+						  <div class="form-group" *ngFor="let hobbieControl of projectForm.get('hobbies').controls;let idx=index">
+							  <input type="text" class="form-control" [formControlName]="idx">
+						  </div>
+						</div>
+							</form>
+						</div>
+					</div>
+				</div>
